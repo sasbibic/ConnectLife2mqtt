@@ -57,3 +57,9 @@ Start the server
 
 **Server:** NodeJS, MQTT
 
+
+## Acknowledgements
+
+- [Connectlife API proxy / MQTT Home Assistant integration](https://github.com/Bilan/connectlife-api-connector)
+- [Homebridge-ConnectLifeAC](https://github.com/HassanElDessouki/Homebridge-ConnectLifeAC)
+

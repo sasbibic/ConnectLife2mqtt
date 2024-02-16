@@ -1,0 +1,17 @@
+{
+  "name": "connectlife2mqtt",
+  "version": "1.0.0",
+  "description": "ConnectLife gateway to MQTT",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Saš Bibič",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.7",
+    "ini": "^4.1.1",
+    "mqtt": "^5.3.5",
+    "node-cron": "^3.0.3"
+  }
+}

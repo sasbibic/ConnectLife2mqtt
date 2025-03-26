@@ -75,7 +75,7 @@ function fetchData() {
     appsProps.forEach((app) => {
         getAppData()
             .then((resp) => {
-                let data = resp.data.find((f)=>f.deviceId == app.id)
+                let data = resp.data.find((f)=>f.puid == app.id)
                 for (const prop in data.statusList) {
                     const value = data.statusList[prop]
                     if (Number.isNaN(Number.parseFloat(value))) {
@@ -106,17 +106,17 @@ function receivedMessage(topic, message) {
     if (topicPath[3] == "set") {
         const appl = appsProps.find((a) => a.name == topicPath[2])
         const props = JSON.parse(message)
-        const setprop = [{
-            properties: {},
-            puid: appl.id
-        }]
-        for (const prop in props) {
-            setprop[0].properties[prop] = props[prop] + ''
+        var setprop = {
+            puid: appl.id,
+            properties: {}
         }
-        console.log(`Info: Set -> ${setprop}`)
+        for (const prop in props) {
+            setprop.properties[prop] = props[prop];
+        }
+        console.log(`Info: Set -> ${JSON.stringify(setprop)}`)
         putAppData(setprop)
             .then((resp) => {
-                console.log(`INFO: Set ${appl.name} <= ${resp.desc}`)
+                console.log(`INFO: Set ${appl.name} <= ${resp.data.desc}`)
                 setTimeout(() => fetchData(), 10000)
             })
     }
@@ -144,7 +144,7 @@ function setupAppliences(appliences) {
                 .then((resp) => {
                     let props = {
                         name: app.deviceNickName,
-                        id: app.deviceId,
+                        id: app.puid,
                         metadata: resp,
                         props: {
                             timestamp: new Date()

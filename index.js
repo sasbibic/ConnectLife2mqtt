@@ -113,6 +113,7 @@ function receivedMessage(topic, message) {
         for (const prop in props) {
             setprop[0].properties[prop] = props[prop] + ''
         }
+        console.log(`Info: Set -> ${setprop}`)
         putAppData(setprop)
             .then((resp) => {
                 console.log(`INFO: Set ${appl.name} <= ${resp.desc}`)

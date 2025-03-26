@@ -1,0 +1,8 @@
+[mqtt]
+server = mqtt://192.168.52.250
+rootTopic = ConnectLife
+#username = example
+#password = expwd
+[ConnectLife]
+username = zan.bibic@gmail.com
+password = "?DFDPyJ!j4#y7vP"

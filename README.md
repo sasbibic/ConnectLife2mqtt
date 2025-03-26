@@ -46,6 +46,7 @@ Start the server
 
 ## Badges
 
+![NodeJS](https://img.shields.io/badge/NodeJs-43853d)
 ![javascript](https://img.shields.io/badge/javascript-8A2BE2)
 ![mqtt](https://img.shields.io/node/v/mqtt?label=mqtt)
 ![ini](https://img.shields.io/node/v/ini?label=ini)

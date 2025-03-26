@@ -1,7 +1,20 @@
 /*
 TCP (net) Server
+
+        Type number : Power        "Power"            [ stateTopic="ConnectLife/appliance/KlimaDS/get" ,    transformationPattern="JSONPATH:$.Power", 
+                                                      commandTopic="ConnectLife/appliance/KlimaDS/put",     formatBeforePublish="{ \"Power\":\"%s\" }"  ]
+        Type number : RoomTemp     "Room temp."       [ stateTopic="ConnectLife/appliance/KlimaDS/get",     transformationPattern="JSONPATH:$.CurrentTemperature" ]
+        Type number : SetTemp      "Set temp."        [ stateTopic="ConnectLife/appliance/KlimaDS/get",     transformationPattern="JSONPATH:$.SetTemperature", 
+                                                      commandTopic="ConnectLife/appliance/KlimaDS/put",     formatBeforePublish="{ \"SetTemperature\":\"%s\" }"  ]
+        Type number : Mode         "Mode"             [ stateTopic="ConnectLife/appliance/KlimaDS/get",     transformationPattern="JSONPATH:$.Mode", 
+                                                      commandTopic="ConnectLife/appliance/KlimaDS/put",     formatBeforePublish="{ \"Mode\":\"%s\" }"  ]
+        Type number : FanMode      "Fan mode"         [ stateTopic="ConnectLife/appliance/KlimaDS/get",     transformationPattern="JSONPATH:$.FanSpeed", 
+                                                      commandTopic="ConnectLife/appliance/KlimaDS/put",     formatBeforePublish="{ \"FanSpeed\":\"%s\" }"   ]
+
 */
 let fs = require('fs'), ini = require('ini')
+const readYamlFile = require('read-yaml-file')
+
 global.config = ini.parse(fs.readFileSync('./server.ini', 'utf-8'))
 
 let mqttHandler = require('./mqtt_handler');
@@ -15,6 +28,11 @@ const ConLIfePWD = global.config.ConnectLife.password
 let serverReady = false
 
 let access_token = ''
+const hdr = {
+    'Host': 'connectlife.bapi.ovh',
+    'User-Agent': 'connectlife-api-connector 2.1.4',
+    'X-Token': access_token
+}
 
 const apiKey = '4_yhTWQmHFpZkQZDSV1uV-_A';
 const gmid = 'gmid.ver4.AtLt3mZAMA.C8m5VqSTEQDrTRrkYYDgOaJWcyQ-XHow5nzQSXJF3EO3TnqTJ8tKUmQaaQ6z8p0s.zcTbHe6Ax6lHfvTN7JUj7VgO4x8Vl-vk1u0kZcrkKmKWw8K9r0shyut_at5Q0ri6zTewnAv2g1Dc8dauuyd-Sw.sc3';
@@ -28,33 +46,22 @@ function getFormData(object) {
     return formData;
 }
 
-async function getAppData(appID) {
-    let url = 'https://api.connectlife.io/api/v1/appliance'
+async function getAppData() {
+    let url = 'https://connectlife.bapi.ovh/appliances'
 
-    if (appID) {
-        url += '/' + appID
-    }
     let promise = axios.get(url,
         {
-            headers: {
-                'Accept': 'application/json',
-                'Authorization': access_token
-            }
+            headers: hdr
         })
-        .catch((err) => {
-            console.log(`ERROR: getAppData(${appID}) => ${err.message}`)
-        })
+
     return promise
 }
 async function putAppData(data) {
-    let url = 'https://api.connectlife.io/api/v1/appliance'
+    let url = 'https://connectlife.bapi.ovh/appliances'
 
     let promise = axios.post(url, data,
         {
-            headers: {
-                'Accept': 'application/json',
-                'Authorization': access_token
-            }
+            headers: hdr
         })
         .catch((err) => {
             console.log(`ERROR: putAppData(${data}) => ${err.message}`)
@@ -66,11 +73,11 @@ function fetchData() {
     if (!serverReady) return
 
     appsProps.forEach((app) => {
-        getAppData(app.id)
+        getAppData()
             .then((resp) => {
-                let data = resp.data[0]
-                for (const prop in data.properties) {
-                    const value = data.properties[prop]
+                let data = resp.data.find((f)=>f.deviceId == app.id)
+                for (const prop in data.statusList) {
+                    const value = data.statusList[prop]
                     if (Number.isNaN(Number.parseFloat(value))) {
                         app.props[prop] = value
                     } else if (Number.isInteger(value)) {
@@ -101,19 +108,22 @@ function receivedMessage(topic, message) {
         const props = JSON.parse(message)
         const setprop = [{
             properties: {},
-            id: appl.id
+            puid: appl.id
         }]
         for (const prop in props) {
             setprop[0].properties[prop] = props[prop] + ''
         }
         putAppData(setprop)
             .then((resp) => {
-                console.log(`INFO: Set ${appl.name} <= ${JSON.stringify(message)}`)
+                console.log(`INFO: Set ${appl.name} <= ${resp.desc}`)
                 setTimeout(() => fetchData(), 10000)
             })
     }
 }
-
+function getDevYaml(app) {
+    let devTypCode = app.deviceTypeCode + '-' + app.deviceFeatureCode
+    return readYamlFile(`appliences/${devTypCode}.yaml`)
+}
 
 function setupAppliences(appliences) {
     let promises = []
@@ -129,22 +139,25 @@ function setupAppliences(appliences) {
     appliences.forEach((app) => {
         let idx = 0
         promises.push(
-            getAppData(`metadata/${app.id}/en`)
+            getDevYaml(app)
                 .then((resp) => {
                     let props = {
-                        name: app.name,
-                        id: app.id,
-                        metadata: resp.data[0].propertyMetadata,
+                        name: app.deviceNickName,
+                        id: app.deviceId,
+                        metadata: resp,
                         props: {
                             timestamp: new Date()
                         },
                     }
-                    resp.data[0].propertyMetadata.forEach((prop) => {
-                        props.props[prop.key] = null
+                    resp.properties.forEach((prop) => {
+                        props.props[prop.property] = null
                     })
-                    mqttClient.subscribe(`appliance/${app.name}/set`, { qos: 0 })
-                    mqttClient.sendMessage(`appliance/${app.name}/metadata`, JSON.stringify(props.metadata))
+                    mqttClient.subscribe(`appliance/${app.deviceNickName}/set`, { qos: 0 })
+                    mqttClient.sendMessage(`appliance/${app.deviceNickName}/metadata`, JSON.stringify(props.metadata))
                     appsProps[idx++] = props
+                })
+                .catch((err) => {
+                    console.log(`ERROR: setupAppliences(${app.id}) => ${err.message}`)
                 })
         )
     })
@@ -162,7 +175,7 @@ function getAccessToken() {
             loginID: ConLifeID,
             password: ConLIfePWD,
             APIKey: apiKey,
-            gmid: gmid,
+            // gmid: gmid,
         }),
         {
             headers: { 'Content-Type': 'multipart/form-data' }
@@ -205,10 +218,16 @@ function getAccessToken() {
         .then((resp) => {
             console.log(`INFO: Logon successfull`)
             access_token = resp.data.access_token
+            hdr['X-Token'] = access_token
             const expires_in = resp.data.expires_in
+ 
             getAppData()
                 .then((resp) => {
                     setupAppliences(resp.data)
+                })
+                .catch((err) => {
+                    console.log(`ERROR: getAppData() => ${err.message}`)
+                    process.exit(1)
                 })
             setTimeout(() => { getAccessToken() }, (expires_in / 2) * 60 * 1000)
         })
